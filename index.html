@@ -371,13 +371,16 @@ document.addEventListener("input",e=>{
 });
 /* ---- checklist "prima di uscire": lista fissa, spunte azzerate ogni giorno ---- */
 const EXIT_DEFAULT=[
- {id:"x1",text:"Documenti e badge"},
- {id:"x2",text:"Divisa / abbigliamento per il turno"},
- {id:"x3",text:"Chiavi"},
- {id:"x4",text:"Telefono e caricatore"},
- {id:"x5",text:"Borraccia con l'acqua"},
- {id:"x6",text:"Cibo preparato"},
- {id:"x7",text:"Terapia / integrazione presa"}
+ {id:"e1",text:"Luci spente"},
+ {id:"e2",text:"Telefono"},
+ {id:"e3",text:"Chiavi casa e lavoro"},
+ {id:"e4",text:"Cibo per la giornata"},
+ {id:"e5",text:"Borraccia"},
+ {id:"e6",text:"Caffè"},
+ {id:"e7",text:"Zaino con dentro: pochette Columbia, pochette Cotopaxi"},
+ {id:"e8",text:"Porta chiusa"},
+ {id:"e9",text:"Garage chiuso"},
+ {id:"e10",text:"Check luci da fuori"}
 ];
 function exitItems(){
   try{const c=JSON.parse(localStorage.getItem(KEY+"config/exitlist"));if(c&&Array.isArray(c.items)&&c.items.length)return c.items}catch(e){}
