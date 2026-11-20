@@ -103,12 +103,23 @@ body{padding-bottom:calc(60px + env(safe-area-inset-bottom))}
 .b{min-width:52px;height:34px;font-size:15px;border-radius:10px}
 .tabs button{padding:4px 0;font-size:11px}
 .tabs button span{font-size:17px}
+.pi{display:flex;gap:10px;padding:9px 0 9px 10px;border-bottom:1px solid var(--line);border-left:3px solid var(--line)}
+.pi:last-child{border-bottom:0}
+.pi .pt{width:86px;flex:none;font-weight:600;font-size:13px;color:var(--mut)}
+.pi .pb{flex:1;font-size:15px;line-height:1.3}
+.pi.k-fisso{border-left-color:var(--acc)}
+.pi.k-impegno{border-left-color:#b45309}
+.pi.k-turno{border-left-color:#475569}
+.pi.k-libero{border-left-style:dashed;opacity:.75}
+.key{font-family:ui-monospace,Menlo,monospace;font-size:11px;word-break:break-all;min-height:90px}
+.tabs button{font-size:10.5px}
 </style>
 </head>
 <body>
 <div id="app"><p class="mut">Caricamento…</p></div>
 <nav class="tabs" id="tabs">
  <button data-tab="oggi"><span>✓</span>Diario</button>
+ <button data-tab="domani"><span>☀</span>Domani</button>
  <button data-tab="storico"><span>☰</span>Storico</button>
  <button data-tab="analisi"><span>▤</span>Analisi</button>
  <button data-tab="domande"><span>⚙</span>Domande</button>
@@ -270,7 +281,7 @@ function csv(){
   return[head,...rows].map(r=>r.map(esc2).join(",")).join("\n");
 }
 function renderExport(){
-  return`<div class="card"><div style="font-weight:600;margin-bottom:6px">Esporta i dati</div><div class="mut" style="margin-bottom:8px">Per l'analisi: copia o scarica il CSV e mandalo a Claude.</div><div class="row"><button class="btn p" data-act="copycsv">Copia CSV</button><button class="btn" data-act="dlcsv">Scarica CSV</button></div><textarea id="csvbox" class="hide" readonly style="margin-top:8px"></textarea></div><div class="card"><div style="font-weight:600;margin-bottom:6px">Backup</div><div class="mut" style="margin-bottom:8px">I dati sono salvati solo su questo telefono. Scarica un backup ogni tanto: se cancelli i dati di Safari o cambi telefono, lo usi per ripristinarli.</div><div class="row"><button class="btn" data-act="dlbackup">Scarica backup</button><label class="btn" style="display:inline-flex;align-items:center">Ripristina<input type="file" id="restore" accept=".json,application/json" class="hide"></label></div></div>`;
+  return`<div class="card"><div style="font-weight:600;margin-bottom:6px">Esporta i dati</div><div class="mut" style="margin-bottom:8px">Per l'analisi: copia o scarica il CSV e mandalo a Claude.</div><div class="row"><button class="btn p" data-act="copycsv">Copia CSV</button><button class="btn" data-act="dlcsv">Scarica CSV</button></div><textarea id="csvbox" class="hide" readonly style="margin-top:8px"></textarea></div><div class="card"><div style="font-weight:600;margin-bottom:6px">Backup</div><div class="mut" style="margin-bottom:8px">I dati sono salvati solo su questo telefono. Scarica un backup ogni tanto: se cancelli i dati di Safari o cambi telefono, lo usi per ripristinarli. Il backup contiene anche la chiave dei piani: tienilo in un posto sicuro.</div><div class="row"><button class="btn" data-act="dlbackup">Scarica backup</button><label class="btn" style="display:inline-flex;align-items:center">Ripristina<input type="file" id="restore" accept=".json,application/json" class="hide"></label></div></div>`;
 }
 function renderDomande(){
   const items=Q();
@@ -286,7 +297,7 @@ function render(){
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===tab));
   const ae=document.activeElement;
   if(ae&&(ae.id==="note"||ae.dataset&&["qtext","qtarget","qsec"].includes(ae.dataset.act)))return; // non interrompere la digitazione
-  $("#app").innerHTML=tab==="oggi"?renderOggi():tab==="storico"?renderStorico():tab==="analisi"?renderAnalisi():renderDomande();
+  $("#app").innerHTML=(tab==="oggi"?renderOggi:tab==="domani"?renderPlan:tab==="storico"?renderStorico:tab==="analisi"?renderAnalisi:renderDomande)();
 }
 function forceRender(){const ae=document.activeElement;if(ae&&ae.blur)ae.blur();render()}
 
@@ -309,8 +320,12 @@ document.addEventListener("click",e=>{
     const text=csv();const box=$("#csvbox");box.value=text;
     navigator.clipboard.writeText(text).then(()=>toast("CSV copiato")).catch(()=>{box.classList.remove("hide");box.select();toast("Copia il testo manualmente")});
   }
+  else if(a==="genkey"){genKey().then(()=>{planDates=null;forceRender()}).catch(()=>toast("Non riesco a creare la chiave su questo browser"))}
+  else if(a==="copykey"){const box=$("#keybox");navigator.clipboard.writeText(pubKeyString()).then(()=>toast("Chiave copiata")).catch(()=>{if(box){box.select()}toast("Copia il testo manualmente")})}
+  else if(a==="reloadplans"){plans={};planDates=null;planBusy=false;forceRender()}
+  else if(a==="pprev"||a==="pnext"){const i=planDates.indexOf(planCur)+(a==="pnext"?1:-1);if(i>=0&&i<planDates.length){planCur=planDates[i];forceRender()}}
   else if(a==="dlcsv"){download("diario-"+today()+".csv",csv(),"text/csv");toast("CSV scaricato")}
-  else if(a==="dlbackup"){download("diario-backup-"+today()+".json",JSON.stringify({version:1,config:Q(),days}),"application/json");toast("Backup scaricato")}
+  else if(a==="dlbackup"){download("diario-backup-"+today()+".json",JSON.stringify({version:1,config:Q(),days,plankey:localStorage.getItem(PKEY)}),"application/json");toast("Backup scaricato")}
   else if(a==="qpos"){const items=Q().map(q=>({...q}));items[+t.dataset.i].pos=!items[+t.dataset.i].pos;saveCfg(items);forceRender()}
   else if(a==="qup"){const i=+t.dataset.i;if(i>0){const items=Q().map(q=>({...q}));[items[i-1],items[i]]=[items[i],items[i-1]];saveCfg(items);forceRender()}}
   else if(a==="qdel"){const items=Q().filter((_,i)=>i!==+t.dataset.i);if(!items.length){toast("Serve almeno una domanda");return}saveCfg(items);forceRender()}
@@ -325,6 +340,7 @@ document.addEventListener("change",e=>{
       const o=JSON.parse(r.result);
       if(!o||typeof o.days!=="object")throw new Error("formato");
       if(Array.isArray(o.config)&&o.config.length)saveCfg(o.config);
+      if(o.plankey&&typeof o.plankey==="string"){try{JSON.parse(o.plankey);localStorage.setItem(PKEY,o.plankey)}catch(e){}}
       for(const k of Object.keys(o.days)){days[k]=o.days[k];write("days/"+k,o.days[k])}
       toast("Backup ripristinato");forceRender();
     }catch(err){toast("File di backup non valido")}
@@ -343,6 +359,69 @@ document.addEventListener("input",e=>{
     valT[id]=setTimeout(()=>{const d=days[date]||{};saveDay(date,{vals:Object.assign({},d.vals,{[id]:val})})},700);
   }
 });
+/* ---- piano di domani: file cifrati nel repository, chiave solo sul telefono ---- */
+const PKEY="diario:plankey";
+let planDates=null,plans={},planCur=null,planErr="",planBusy=false;
+function b64d(x){const bin=atob(x),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u}
+function planKeys(){try{return JSON.parse(localStorage.getItem(PKEY))}catch(e){return null}}
+async function genKey(){
+  const kp=await crypto.subtle.generateKey({name:"RSA-OAEP",modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:"SHA-256"},true,["encrypt","decrypt"]);
+  const pub=await crypto.subtle.exportKey("jwk",kp.publicKey),prv=await crypto.subtle.exportKey("jwk",kp.privateKey);
+  localStorage.setItem(PKEY,JSON.stringify({pub,prv}));
+}
+async function decryptPlan(o){
+  const k=planKeys();if(!k)throw new Error("nokey");
+  const prv=await crypto.subtle.importKey("jwk",k.prv,{name:"RSA-OAEP",hash:"SHA-256"},false,["decrypt"]);
+  const raw=await crypto.subtle.decrypt({name:"RSA-OAEP"},prv,b64d(o.k));
+  const aes=await crypto.subtle.importKey("raw",raw,"AES-GCM",false,["decrypt"]);
+  const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(o.iv)},aes,b64d(o.d));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+async function loadPlan(date){
+  if(!date||plans[date])return;
+  try{const r=await fetch("plans/"+date+".json",{cache:"no-store"});if(!r.ok)throw new Error(r.status);plans[date]=await decryptPlan(await r.json())}
+  catch(e){plans[date]={error:true}}
+}
+async function loadPlans(){
+  if(planBusy)return;planBusy=true;planErr="";
+  try{
+    const r=await fetch("plans/index.json",{cache:"no-store"});
+    if(!r.ok)throw new Error(r.status);
+    const ix=await r.json();planDates=(ix.dates||[]).slice().sort();
+    if(!planCur||!planDates.includes(planCur)){
+      const t=shift(today(),1);
+      planCur=planDates.includes(t)?t:(planDates.filter(x=>x>=today())[0]||planDates[planDates.length-1]||null);
+    }
+    if(planKeys())await loadPlan(planCur);
+  }catch(e){if(planDates===null)planDates=[];planErr=navigator.onLine?"Nessun piano trovato.":"Sei offline e non ho un piano salvato."}
+  planBusy=false;if(tab==="domani")forceRender();
+}
+function pubKeyString(){const k=planKeys();return k&&k.pub?k.pub.n:""}
+function renderPlan(){
+  if(!planKeys()){
+    return`<h1>Domani</h1><div class="card"><div style="font-weight:600;margin-bottom:6px">Prima configurazione</div><div class="mut" style="margin-bottom:10px">Il piano di domani arriva cifrato: solo questo telefono può leggerlo. Tocca il pulsante per creare la chiave, poi copia il testo e mandalo a Claude in chat.</div><button class="btn p" data-act="genkey">Crea la chiave</button></div>`;
+  }
+  if(planDates===null){if(!planBusy)loadPlans();return`<h1>Domani</h1><div class="card mut">Caricamento…</div>`+renderKeyCard()}
+  const date=planCur,pl=date?plans[date]:null;
+  let h=`<div class="nav"><button class="ib" data-act="pprev" ${planDates.indexOf(date)<=0?"disabled":""}>‹</button><div class="d">${date?esc(label(date)):"Nessun piano"}</div><button class="ib" data-act="pnext" ${planDates.indexOf(date)>=planDates.length-1?"disabled":""}>›</button></div>`;
+  if(!date){h+=`<div class="card mut">${esc(planErr||"Ancora nessun piano. La sera scrivi a Claude «pianifica domani».")}</div>`}
+  else if(!pl){loadPlan(date).then(()=>{if(tab==="domani")forceRender()});h+=`<div class="card mut">Caricamento…</div>`}
+  else if(pl.error){h+=`<div class="card mut">Non riesco a leggere questo piano. Se hai creato una nuova chiave dopo la sua pubblicazione, o hai cambiato telefono, chiedi a Claude di ripubblicarlo.</div>`}
+  else{
+    h+=`<div class="card">`;
+    if(pl.title)h+=`<div style="font-weight:700;font-size:17px;margin-bottom:6px">${esc(pl.title)}</div>`;
+    for(const it of pl.items||[]){
+      const t=it.start?(it.end?it.start+" – "+it.end:it.start):"";
+      h+=`<div class="pi k-${esc(it.kind||"fisso")}"><div class="pt">${esc(t)}</div><div class="pb">${esc(it.text)}</div></div>`;
+    }
+    h+=`</div>`;
+    if(pl.notes&&pl.notes.length)h+=`<div class="card"><div style="font-weight:600;margin-bottom:6px">Da ricordare</div>${pl.notes.map(n=>`<div style="padding:3px 0">• ${esc(n)}</div>`).join("")}</div>`;
+  }
+  return h+renderKeyCard();
+}
+function renderKeyCard(){
+  return`<div class="card"><div style="font-weight:600;margin-bottom:6px">Chiave del piano</div><div class="mut" style="margin-bottom:8px">Questa è la parte pubblica della chiave: serve a Claude per cifrare i piani. Non permette di leggerli.</div><textarea id="keybox" class="key" readonly>${esc(pubKeyString())}</textarea><div class="row" style="margin-top:8px"><button class="btn p" data-act="copykey">Copia chiave</button><button class="btn" data-act="reloadplans">Aggiorna piani</button></div></div>`;
+}
 /* ---- avvio ---- */
 ready=true;loadAll();render();
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
