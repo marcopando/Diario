@@ -290,13 +290,14 @@ function renderDomande(){
     h+=`<div class="set" style="flex-wrap:wrap"><input type="text" data-act="qtext" data-i="${i}" value="${esc(q.text)}"><button class="sm ${q.pos?"on":""}" data-act="qpos" data-i="${i}" title="Sì è positivo">✓</button><button class="sm" data-act="qup" data-i="${i}">↑</button><button class="sm" data-act="qdel" data-i="${i}">✕</button><input type="text" data-act="qtarget" data-i="${i}" value="${esc(q.target||"")}" placeholder="Obiettivo (es. 30-60 min)" style="flex:1;height:36px;font-size:14px"><input type="text" data-act="qsec" data-i="${i}" value="${esc(q.sec||"")}" placeholder="Sezione" style="flex:1;height:36px;font-size:14px"></div>`;
   });
   h+=`<div style="margin-top:12px"><button class="btn p" data-act="qadd">+ Aggiungi domanda</button></div></div>`;
+  h+=renderExitEdit();
   return h;
 }
 function render(){
   if(!ready)return;
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===tab));
   const ae=document.activeElement;
-  if(ae&&(ae.id==="note"||ae.dataset&&["qtext","qtarget","qsec"].includes(ae.dataset.act)))return; // non interrompere la digitazione
+  if(ae&&(ae.id==="note"||ae.dataset&&["qtext","qtarget","qsec","xtext"].includes(ae.dataset.act)))return; // non interrompere la digitazione
   $("#app").innerHTML=(tab==="oggi"?renderOggi:tab==="domani"?renderPlan:tab==="storico"?renderStorico:tab==="analisi"?renderAnalisi:renderDomande)();
 }
 function forceRender(){const ae=document.activeElement;if(ae&&ae.blur)ae.blur();render()}
@@ -325,10 +326,14 @@ document.addEventListener("click",e=>{
   else if(a==="reloadplans"){plans={};planDates=null;planBusy=false;forceRender()}
   else if(a==="pprev"||a==="pnext"){const i=planDates.indexOf(planCur)+(a==="pnext"?1:-1);if(i>=0&&i<planDates.length){planCur=planDates[i];forceRender()}}
   else if(a==="dlcsv"){download("diario-"+today()+".csv",csv(),"text/csv");toast("CSV scaricato")}
-  else if(a==="dlbackup"){download("diario-backup-"+today()+".json",JSON.stringify({version:1,config:Q(),days,plankey:localStorage.getItem(PKEY)}),"application/json");toast("Backup scaricato")}
+  else if(a==="dlbackup"){download("diario-backup-"+today()+".json",JSON.stringify({version:1,config:Q(),days,plankey:localStorage.getItem(PKEY),exitlist:exitItems()}),"application/json");toast("Backup scaricato")}
   else if(a==="qpos"){const items=Q().map(q=>({...q}));items[+t.dataset.i].pos=!items[+t.dataset.i].pos;saveCfg(items);forceRender()}
   else if(a==="qup"){const i=+t.dataset.i;if(i>0){const items=Q().map(q=>({...q}));[items[i-1],items[i]]=[items[i],items[i-1]];saveCfg(items);forceRender()}}
   else if(a==="qdel"){const items=Q().filter((_,i)=>i!==+t.dataset.i);if(!items.length){toast("Serve almeno una domanda");return}saveCfg(items);forceRender()}
+  else if(a==="xtick"){const d=exitDone();if(d[t.dataset.id])delete d[t.dataset.id];else d[t.dataset.id]=true;write("ticks/"+today(),d);forceRender()}
+  else if(a==="xup"){const i=+t.dataset.i;if(i>0){const it=exitItems().map(x=>({...x}));[it[i-1],it[i]]=[it[i],it[i-1]];saveExit(it);forceRender()}}
+  else if(a==="xdel"){const it=exitItems().filter((_,i)=>i!==+t.dataset.i);if(!it.length){toast("Serve almeno una voce");return}saveExit(it);forceRender()}
+  else if(a==="xadd"){const it=exitItems().map(x=>({...x}));it.push({id:"x"+Date.now().toString(36),text:"Nuova voce"});saveExit(it);forceRender()}
   else if(a==="qadd"){const items=Q().map(q=>({...q}));items.push({id:"q"+Date.now().toString(36),text:"Nuova domanda",pos:true});saveCfg(items);forceRender()}
 });
 document.addEventListener("change",e=>{
@@ -340,6 +345,7 @@ document.addEventListener("change",e=>{
       const o=JSON.parse(r.result);
       if(!o||typeof o.days!=="object")throw new Error("formato");
       if(Array.isArray(o.config)&&o.config.length)saveCfg(o.config);
+      if(Array.isArray(o.exitlist)&&o.exitlist.length)saveExit(o.exitlist);
       if(o.plankey&&typeof o.plankey==="string"){try{JSON.parse(o.plankey);localStorage.setItem(PKEY,o.plankey)}catch(e){}}
       for(const k of Object.keys(o.days)){days[k]=o.days[k];write("days/"+k,o.days[k])}
       toast("Backup ripristinato");forceRender();
@@ -353,12 +359,48 @@ document.addEventListener("input",e=>{
     clearTimeout(noteT);const i=+t.dataset.i,val=t.value,field={qtext:"text",qtarget:"target",qsec:"sec"}[t.dataset.act];
     noteT=setTimeout(()=>{const items=Q().map(q=>({...q}));if(items[i]){items[i][field]=val;saveCfg(items)}},700);
   }
+  else if(t.dataset&&t.dataset.act==="xtext"){
+    clearTimeout(noteT);const i=+t.dataset.i,val=t.value;
+    noteT=setTimeout(()=>{const it=exitItems().map(x=>({...x}));if(it[i]){it[i].text=val;saveExit(it)}},700);
+  }
   else if(t.dataset&&t.dataset.act==="val"){
     const id=t.dataset.q,date=cur,val=t.value;
     clearTimeout(valT[id]);
     valT[id]=setTimeout(()=>{const d=days[date]||{};saveDay(date,{vals:Object.assign({},d.vals,{[id]:val})})},700);
   }
 });
+/* ---- checklist "prima di uscire": lista fissa, spunte azzerate ogni giorno ---- */
+const EXIT_DEFAULT=[
+ {id:"x1",text:"Documenti e badge"},
+ {id:"x2",text:"Divisa / abbigliamento per il turno"},
+ {id:"x3",text:"Chiavi"},
+ {id:"x4",text:"Telefono e caricatore"},
+ {id:"x5",text:"Borraccia con l'acqua"},
+ {id:"x6",text:"Cibo preparato"},
+ {id:"x7",text:"Terapia / integrazione presa"}
+];
+function exitItems(){
+  try{const c=JSON.parse(localStorage.getItem(KEY+"config/exitlist"));if(c&&Array.isArray(c.items)&&c.items.length)return c.items}catch(e){}
+  return EXIT_DEFAULT;
+}
+function saveExit(items){write("config/exitlist",{items})}
+function exitDone(){try{return JSON.parse(localStorage.getItem(KEY+"ticks/"+today()))||{}}catch(e){return{}}}
+function renderExit(){
+  const items=exitItems(),done=exitDone();
+  const n=items.filter(x=>done[x.id]).length;
+  let h=`<div class="card"><div class="row" style="justify-content:space-between;margin-bottom:4px"><div style="font-weight:600">Prima di uscire</div><div class="mut">${n===items.length?"Tutto pronto ✓":n+"/"+items.length}</div></div>`;
+  for(const x of items){
+    const on=!!done[x.id];
+    h+=`<div class="q" style="padding:2px 0"><div class="qr"><div class="qt" style="${on?"color:var(--mut);text-decoration:line-through":""}">${esc(x.text)}</div><div class="yn"><button class="b y ${on?"on":""}" data-act="xtick" data-id="${esc(x.id)}" style="min-width:52px;height:34px">${on?"✓":""}</button></div></div></div>`;
+  }
+  return h+`</div>`;
+}
+function renderExitEdit(){
+  const items=exitItems();
+  let h=`<div class="card mut" style="margin:12px 0">Lista «Prima di uscire»: appare in Domani, sotto la giornata. Le spunte si azzerano ogni giorno.</div><div class="card">`;
+  items.forEach((x,i)=>{h+=`<div class="set"><input type="text" data-act="xtext" data-i="${i}" value="${esc(x.text)}"><button class="sm" data-act="xup" data-i="${i}">↑</button><button class="sm" data-act="xdel" data-i="${i}">✕</button></div>`});
+  return h+`<div style="margin-top:12px"><button class="btn p" data-act="xadd">+ Aggiungi voce</button></div></div>`;
+}
 /* ---- piano di domani: file cifrati nel repository, chiave solo sul telefono ---- */
 const PKEY="diario:plankey";
 let planDates=null,plans={},planCur=null,planErr="",planBusy=false;
@@ -401,7 +443,7 @@ function renderPlan(){
   if(!planKeys()){
     return`<h1>Domani</h1><div class="card"><div style="font-weight:600;margin-bottom:6px">Prima configurazione</div><div class="mut" style="margin-bottom:10px">Il piano di domani arriva cifrato: solo questo telefono può leggerlo. Tocca il pulsante per creare la chiave, poi copia il testo e mandalo a Claude in chat.</div><button class="btn p" data-act="genkey">Crea la chiave</button></div>`;
   }
-  if(planDates===null){if(!planBusy)loadPlans();return`<h1>Domani</h1><div class="card mut">Caricamento…</div>`+renderKeyCard()}
+  if(planDates===null){if(!planBusy)loadPlans();return`<h1>Domani</h1><div class="card mut">Caricamento…</div>`+renderExit()+renderKeyCard()}
   const date=planCur,pl=date?plans[date]:null;
   let h=`<div class="nav"><button class="ib" data-act="pprev" ${planDates.indexOf(date)<=0?"disabled":""}>‹</button><div class="d">${date?esc(label(date)):"Nessun piano"}</div><button class="ib" data-act="pnext" ${planDates.indexOf(date)>=planDates.length-1?"disabled":""}>›</button></div>`;
   if(!date){h+=`<div class="card mut">${esc(planErr||"Ancora nessun piano. La sera scrivi a Claude «pianifica domani».")}</div>`}
@@ -417,7 +459,7 @@ function renderPlan(){
     h+=`</div>`;
     if(pl.notes&&pl.notes.length)h+=`<div class="card"><div style="font-weight:600;margin-bottom:6px">Da ricordare</div>${pl.notes.map(n=>`<div style="padding:3px 0">• ${esc(n)}</div>`).join("")}</div>`;
   }
-  return h+renderKeyCard();
+  return h+renderExit()+renderKeyCard();
 }
 function renderKeyCard(){
   return`<div class="card"><div style="font-weight:600;margin-bottom:6px">Chiave del piano</div><div class="mut" style="margin-bottom:8px">Questa è la parte pubblica della chiave: serve a Claude per cifrare i piani. Non permette di leggerli.</div><textarea id="keybox" class="key" readonly>${esc(pubKeyString())}</textarea><div class="row" style="margin-top:8px"><button class="btn p" data-act="copykey">Copia chiave</button><button class="btn" data-act="reloadplans">Aggiorna piani</button></div></div>`;
