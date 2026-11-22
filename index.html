@@ -111,6 +111,11 @@ body{padding-bottom:calc(60px + env(safe-area-inset-bottom))}
 .pi.k-impegno{border-left-color:#b45309}
 .pi.k-turno{border-left-color:#475569}
 .pi.k-libero{border-left-style:dashed;opacity:.75}
+.pi.c-casa{border-left-color:#14b8a6}
+.pi.c-asjg,.pi.c-burg{border-left-color:#4ade80}
+.pi.c-asjn,.pi.c-burn{border-left-color:#15803d}
+.pi.c-t7{border-left-color:#eab308}
+.pi.c-t9{border-left-color:#f97316}
 .key{font-family:ui-monospace,Menlo,monospace;font-size:11px;word-break:break-all;min-height:90px}
 .tabs button{font-size:10.5px}
 </style>
@@ -492,7 +497,7 @@ function renderPlan(){
     if(pl.title)h+=`<div style="font-weight:700;font-size:17px;margin-bottom:6px">${esc(pl.title)}</div>`;
     for(const it of pl.items||[]){
       const t=it.start?(it.end?it.start+" – "+it.end:it.start):"";
-      h+=`<div class="pi k-${esc(it.kind||"fisso")}"><div class="pt">${esc(t)}</div><div class="pb">${esc(it.text)}</div></div>`;
+      h+=`<div class="pi k-${esc(it.kind||"fisso")}${it.c?" c-"+esc(it.c):""}"><div class="pt">${esc(t)}</div><div class="pb">${esc(it.text)}</div></div>`;
     }
     h+=`</div>`;
   }
