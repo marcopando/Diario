@@ -446,12 +446,29 @@ async function loadPlans(){
   }catch(e){if(planDates===null)planDates=[];planErr=navigator.onLine?"Nessun piano trovato.":"Sei offline e non ho un piano salvato."}
   planBusy=false;if(tab==="domani")forceRender();
 }
+let careData=null,careBusy=false;
+async function loadCare(){
+  if(careBusy)return;careBusy=true;
+  try{const r=await fetch("plans/cura.json",{cache:"no-store"});if(!r.ok)throw 0;careData=(await r.json()).items||[]}catch(e){careData=careData||[]}
+  careBusy=false;if(tab==="domani")forceRender();
+}
+function renderCare(){
+  if(careData===null){loadCare();return""}
+  if(!careData.length)return"";
+  const t=today();let h=`<div class="card"><div style="font-weight:600;margin-bottom:6px">Cura personale</div>`;
+  for(const it of careData){
+    const due=shift(it.last,it.every),d=Math.round((new Date(due+"T12:00:00")-new Date(t+"T12:00:00"))/864e5);
+    const st=d<0?"in ritardo di "+(-d)+" g":d===0?"oggi":"tra "+d+" g";
+    h+=`<div class="pi ${d<=0?"k-impegno":"k-libero"}"><div class="pb">${esc(it.text)}</div><div class="pt" style="margin-left:auto">${esc(label(due))} · ${st}</div></div>`;
+  }
+  return h+`</div>`;
+}
 function pubKeyString(){const k=planKeys();return k&&k.pub?k.pub.n:""}
 function renderPlan(){
   if(!planKeys()){
     return`<h1>Domani</h1><div class="card"><div style="font-weight:600;margin-bottom:6px">Prima configurazione</div><div class="mut" style="margin-bottom:10px">Il piano di domani arriva cifrato: solo questo telefono può leggerlo. Tocca il pulsante per creare la chiave, poi copia il testo e mandalo a Claude in chat.</div><button class="btn p" data-act="genkey">Crea la chiave</button></div>`;
   }
-  if(planDates===null){if(!planBusy)loadPlans();return`<h1>Domani</h1><div class="card mut">Caricamento…</div>`+renderList("exit")+renderList("night")+renderKeyCard()}
+  if(planDates===null){if(!planBusy)loadPlans();return`<h1>Domani</h1><div class="card mut">Caricamento…</div>`+renderCare()+renderList("exit")+renderList("night")+renderKeyCard()}
   const date=planCur,pl=date?plans[date]:null;
   let h=`<div class="nav"><button class="ib" data-act="pprev" ${planDates.indexOf(date)<=0?"disabled":""}>‹</button><div class="d">${date?esc(label(date)):"Nessun piano"}</div><button class="ib" data-act="pnext" ${planDates.indexOf(date)>=planDates.length-1?"disabled":""}>›</button></div>`;
   if(!date){h+=`<div class="card mut">${esc(planErr||"Ancora nessun piano. La sera scrivi a Claude «pianifica domani».")}</div>`}
@@ -466,7 +483,7 @@ function renderPlan(){
     }
     h+=`</div>`;
   }
-  return h+renderList("exit")+renderList("night")+renderKeyCard();
+  return h+renderCare()+renderList("exit")+renderList("night")+renderKeyCard();
 }
 function renderKeyCard(){
   return`<div class="card"><div style="font-weight:600;margin-bottom:6px">Chiave del piano</div><div class="mut" style="margin-bottom:8px">Questa è la parte pubblica della chiave: serve a Claude per cifrare i piani. Non permette di leggerli.</div><textarea id="keybox" class="key" readonly>${esc(pubKeyString())}</textarea><div class="row" style="margin-top:8px"><button class="btn p" data-act="copykey">Copia chiave</button><button class="btn" data-act="reloadplans">Aggiorna piani</button></div></div>`;

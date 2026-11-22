@@ -21,3 +21,6 @@ Formato di `piano.json`:
 La parte pubblica della chiave è in `plans/key.json`. Se manca (o l'utente ha ricreato la chiave nell'app), si imposta con
 `python3 tools/publish_plan.py set-key <n>`, dove `<n>` è il testo mostrato in Domani → Chiave del piano.
 Servono `python3` e il pacchetto `cryptography`.
+
+## Cura personale
+`plans/cura.json` (in chiaro, nessun dato sensibile): per ogni voce `every` = ogni quanti giorni, `last` = ultima volta (AAAA-MM-GG). Claude lo legge quando pianifica la giornata e lo aggiorna quando Marco dice di aver fatto una cosa. La scheda Domani lo mostra.

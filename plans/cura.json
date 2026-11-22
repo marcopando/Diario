@@ -1,0 +1,22 @@
+{
+ "items": [
+  {
+   "id": "unghie",
+   "text": "Unghie",
+   "every": 7,
+   "last": "2026-11-22"
+  },
+  {
+   "id": "depilazione",
+   "text": "Depilazione",
+   "every": 10,
+   "last": "2026-11-22"
+  },
+  {
+   "id": "barba",
+   "text": "Barba",
+   "every": 30,
+   "last": "2026-11-22"
+  }
+ ]
+}
