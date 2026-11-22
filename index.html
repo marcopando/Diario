@@ -455,10 +455,12 @@ async function loadCare(){
 function renderCare(){
   if(careData===null){loadCare();return""}
   if(!careData.length)return"";
-  const t=today();let h=`<div class="card"><div style="font-weight:600;margin-bottom:6px">Cura personale</div>`;
-  for(const it of careData){
-    const due=shift(it.last,it.every),d=Math.round((new Date(due+"T12:00:00")-new Date(t+"T12:00:00"))/864e5);
-    const st=d<0?"in ritardo di "+(-d)+" g":d===0?"oggi":"tra "+d+" g";
+  const t=planCur||shift(today(),1);
+  const rows=careData.map(it=>{const due=shift(it.last,it.every);return{it,due,d:Math.round((new Date(due+"T12:00:00")-new Date(t+"T12:00:00"))/864e5)}}).filter(r=>r.d<=0);
+  if(!rows.length)return"";
+  let h=`<div class="card"><div style="font-weight:600;margin-bottom:6px">Cura personale</div>`;
+  for(const {it,due,d} of rows){
+    const st=d<0?"in ritardo di "+(-d)+" g":"scade questo giorno";
     h+=`<div class="pi ${d<=0?"k-impegno":"k-libero"}"><div class="pb">${esc(it.text)}</div><div class="pt" style="margin-left:auto">${esc(label(due))} · ${st}</div></div>`;
   }
   return h+`</div>`;
