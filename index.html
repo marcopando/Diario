@@ -330,7 +330,7 @@ document.addEventListener("click",e=>{
   else if(a==="qpos"){const items=Q().map(q=>({...q}));items[+t.dataset.i].pos=!items[+t.dataset.i].pos;saveCfg(items);forceRender()}
   else if(a==="qup"){const i=+t.dataset.i;if(i>0){const items=Q().map(q=>({...q}));[items[i-1],items[i]]=[items[i],items[i-1]];saveCfg(items);forceRender()}}
   else if(a==="qdel"){const items=Q().filter((_,i)=>i!==+t.dataset.i);if(!items.length){toast("Serve almeno una domanda");return}saveCfg(items);forceRender()}
-  else if(a==="xtick"){const k=t.dataset.k,d=listDone(k);if(d[t.dataset.id])delete d[t.dataset.id];else d[t.dataset.id]=true;write(LISTS[k].tick+today(),d);forceRender()}
+  else if(a==="xtick"){const k=t.dataset.k,d=listDone(k);if(d[t.dataset.id])delete d[t.dataset.id];else d[t.dataset.id]=true;write(LISTS[k].tick+listDate(k),d);forceRender()}
   else if(a==="xup"){const k=t.dataset.k,i=+t.dataset.i;if(i>0){const it=listItems(k).map(x=>({...x}));[it[i-1],it[i]]=[it[i],it[i-1]];saveList(k,it);forceRender()}}
   else if(a==="xdel"){const k=t.dataset.k,it=listItems(k).filter((_,i)=>i!==+t.dataset.i);if(!it.length){toast("Serve almeno una voce");return}saveList(k,it);forceRender()}
   else if(a==="xsub"){const k=t.dataset.k,it=listItems(k).map(x=>({...x})),i=+t.dataset.i;if(it[i]){it[i].sub=!it[i].sub;saveList(k,it);forceRender()}}
@@ -402,7 +402,8 @@ function listItems(k){
   return LISTS[k].def;
 }
 function saveList(k,items){write(LISTS[k].cfg,{items})}
-function listDone(k){try{return JSON.parse(localStorage.getItem(KEY+LISTS[k].tick+today()))||{}}catch(e){return{}}}
+function listDate(k){return k==="wake"?(planCur||today()):today()}
+function listDone(k){try{return JSON.parse(localStorage.getItem(KEY+LISTS[k].tick+listDate(k)))||{}}catch(e){return{}}}
 function renderList(k){
   const items=listItems(k),done=listDone(k);
   const n=items.filter(x=>done[x.id]).length;
@@ -449,7 +450,7 @@ async function loadPlans(){
     if(!r.ok)throw new Error(r.status);
     const ix=await r.json();planDates=(ix.dates||[]).slice().sort();
     if(!planCur||!planDates.includes(planCur)){
-      const t=shift(today(),1);
+      const t=(new Date().getHours()<12&&planDates.includes(today()))?today():shift(today(),1);
       planCur=planDates.includes(t)?t:(planDates.filter(x=>x>=today())[0]||planDates[planDates.length-1]||null);
     }
     if(planKeys())await loadPlan(planCur);
@@ -497,13 +498,9 @@ function renderPlan(){
   }
   return h+renderCare()+renderWake()+renderList("exit")+renderList("night")+renderKeyCard();
 }
-let todayPending=false;
 function renderWake(){
-  const td=today();
-  if(!planDates||!planDates.includes(td)||!planKeys())return"";
-  const pl=plans[td];
-  if(!pl){if(!todayPending){todayPending=true;loadPlan(td).then(()=>{todayPending=false;if(tab==="domani")forceRender()})}return""}
-  return(pl.lists||[]).includes("wake")?renderList("wake"):"";
+  const pl=planCur?plans[planCur]:null;
+  return pl&&!pl.error&&(pl.lists||[]).includes("wake")?renderList("wake"):"";
 }
 function renderKeyCard(){
   return`<div class="card"><div style="font-weight:600;margin-bottom:6px">Chiave del piano</div><div class="mut" style="margin-bottom:8px">Questa è la parte pubblica della chiave: serve a Claude per cifrare i piani. Non permette di leggerli.</div><textarea id="keybox" class="key" readonly>${esc(pubKeyString())}</textarea><div class="row" style="margin-top:8px"><button class="btn p" data-act="copykey">Copia chiave</button><button class="btn" data-act="reloadplans">Aggiorna piani</button></div></div>`;
