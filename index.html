@@ -302,7 +302,7 @@ function renderDomande(){
     h+=`<div class="set" style="flex-wrap:wrap"><input type="text" data-act="qtext" data-i="${i}" value="${esc(q.text)}"><button class="sm ${q.pos?"on":""}" data-act="qpos" data-i="${i}" title="Sì è positivo">✓</button><button class="sm" data-act="qup" data-i="${i}">↑</button><button class="sm" data-act="qdel" data-i="${i}">✕</button><input type="text" data-act="qtarget" data-i="${i}" value="${esc(q.target||"")}" placeholder="Obiettivo (es. 30-60 min)" style="flex:1;height:36px;font-size:14px"><input type="text" data-act="qsec" data-i="${i}" value="${esc(q.sec||"")}" placeholder="Sezione" style="flex:1;height:36px;font-size:14px"></div>`;
   });
   h+=`<div style="margin-top:12px"><button class="btn p" data-act="qadd">+ Aggiungi domanda</button></div></div>`;
-  h+=renderListEdit("wake")+renderListEdit("exit")+renderListEdit("night");
+  h+=renderListEdit("wake")+renderListEdit("exit")+renderListEdit("light")+renderListEdit("night");
   return h;
 }
 function render(){
@@ -338,7 +338,7 @@ document.addEventListener("click",e=>{
   else if(a==="reloadplans"){plans={};planDates=null;planBusy=false;forceRender()}
   else if(a==="pprev"||a==="pnext"){const i=planDates.indexOf(planCur)+(a==="pnext"?1:-1);if(i>=0&&i<planDates.length){planCur=planDates[i];forceRender()}}
   else if(a==="dlcsv"){download("diario-"+today()+".csv",csv(),"text/csv");toast("CSV scaricato")}
-  else if(a==="dlbackup"){download("diario-backup-"+today()+".json",JSON.stringify({version:1,config:Q(),days,plankey:localStorage.getItem(PKEY),exitlist:listItems("exit"),nightlist:listItems("night"),wakelist:listItems("wake")}),"application/json");toast("Backup scaricato")}
+  else if(a==="dlbackup"){download("diario-backup-"+today()+".json",JSON.stringify({version:1,config:Q(),days,plankey:localStorage.getItem(PKEY),exitlist:listItems("exit"),nightlist:listItems("night"),wakelist:listItems("wake"),lightlist:listItems("light")}),"application/json");toast("Backup scaricato")}
   else if(a==="qpos"){const items=Q().map(q=>({...q}));items[+t.dataset.i].pos=!items[+t.dataset.i].pos;saveCfg(items);forceRender()}
   else if(a==="qup"){const i=+t.dataset.i;if(i>0){const items=Q().map(q=>({...q}));[items[i-1],items[i]]=[items[i],items[i-1]];saveCfg(items);forceRender()}}
   else if(a==="qdel"){const items=Q().filter((_,i)=>i!==+t.dataset.i);if(!items.length){toast("Serve almeno una domanda");return}saveCfg(items);forceRender()}
@@ -361,6 +361,7 @@ document.addEventListener("change",e=>{
       if(Array.isArray(o.exitlist)&&o.exitlist.length)saveList("exit",o.exitlist);
       if(Array.isArray(o.nightlist)&&o.nightlist.length)saveList("night",o.nightlist);
       if(Array.isArray(o.wakelist)&&o.wakelist.length)saveList("wake",o.wakelist);
+      if(Array.isArray(o.lightlist)&&o.lightlist.length)saveList("light",o.lightlist);
       if(o.plankey&&typeof o.plankey==="string"){try{JSON.parse(o.plankey);localStorage.setItem(PKEY,o.plankey)}catch(e){}}
       for(const k of Object.keys(o.days)){days[k]=o.days[k];write("days/"+k,o.days[k])}
       toast("Backup ripristinato");forceRender();
@@ -397,6 +398,11 @@ const LISTS={
   {id:"e8",text:"Porta chiusa"},
   {id:"e9",text:"Garage chiuso"},
   {id:"e10",text:"Check luci da fuori"}]},
+ light:{title:"Prima di uscire",etitle:"Prima di uscire · giorno libero",cfg:"config/lightlist",tick:"ticksl/",def:[
+  {id:"l1",text:"Telefono"},
+  {id:"l2",text:"Chiavi casa e lavoro"},
+  {id:"l3",text:"Portafogli"},
+  {id:"l4",text:"Porta chiusa"}]},
  wake:{title:"Appena sveglio",cfg:"config/wakelist",tick:"ticksw/",def:[
   {id:"w1",text:"Igiene personale"},
   {id:"w1a",text:"Denti",sub:true},
@@ -414,7 +420,7 @@ function listItems(k){
   return LISTS[k].def;
 }
 function saveList(k,items){write(LISTS[k].cfg,{items})}
-function listDate(k){return k==="wake"?(planCur||today()):today()}
+function listDate(k){return k==="wake"||k==="exit"||k==="light"?(planCur||today()):today()}
 function listDone(k){try{return JSON.parse(localStorage.getItem(KEY+LISTS[k].tick+listDate(k)))||{}}catch(e){return{}}}
 function renderList(k){
   const items=listItems(k),done=listDone(k);
@@ -428,7 +434,7 @@ function renderList(k){
 }
 function renderListEdit(k){
   const items=listItems(k);
-  let h=`<div class="card mut" style="margin:12px 0">Lista «${LISTS[k].title}»: appare in Domani. Le spunte si azzerano ogni giorno.</div><div class="card">`;
+  let h=`<div class="card mut" style="margin:12px 0">Lista «${LISTS[k].etitle||LISTS[k].title}»: appare in Domani${k==="exit"?" nei giorni di lavoro":k==="light"?" nei giorni liberi":""}. Le spunte si azzerano ogni giorno.</div><div class="card">`;
   items.forEach((x,i)=>{h+=`<div class="set"><input type="text" data-act="xtext" data-k="${k}" data-i="${i}" value="${esc(x.text)}"><button class="sm" data-act="xsub" data-k="${k}" data-i="${i}" title="Sotto-voce">${x.sub?"⇤":"⇥"}</button><button class="sm" data-act="xup" data-k="${k}" data-i="${i}">↑</button><button class="sm" data-act="xdel" data-k="${k}" data-i="${i}">✕</button></div>`});
   return h+`<div style="margin-top:12px"><button class="btn p" data-act="xadd" data-k="${k}">+ Aggiungi voce</button></div></div>`;
 }
@@ -493,7 +499,7 @@ function renderPlan(){
   if(!planKeys()){
     return`<h1>Domani</h1><div class="card"><div style="font-weight:600;margin-bottom:6px">Prima configurazione</div><div class="mut" style="margin-bottom:10px">Il piano di domani arriva cifrato: solo questo telefono può leggerlo. Tocca il pulsante per creare la chiave, poi copia il testo e mandalo a Claude in chat.</div><button class="btn p" data-act="genkey">Crea la chiave</button></div>`;
   }
-  if(planDates===null){if(!planBusy)loadPlans();return`<h1>Domani</h1><div class="card mut">Caricamento…</div>`+renderCare()+renderWake()+renderList("exit")+renderList("night")+renderKeyCard()}
+  if(planDates===null){if(!planBusy)loadPlans();return`<h1>Domani</h1><div class="card mut">Caricamento…</div>`+renderCare()+renderWake()+renderExit()+renderList("night")+renderKeyCard()}
   const date=planCur,pl=date?plans[date]:null;
   let h=`<div class="nav"><button class="ib" data-act="pprev" ${planDates.indexOf(date)<=0?"disabled":""}>‹</button><div class="d">${date?esc(label(date)):"Nessun piano"}</div><button class="ib" data-act="pnext" ${planDates.indexOf(date)>=planDates.length-1?"disabled":""}>›</button></div>`;
   if(!date){h+=`<div class="card mut">${esc(planErr||"Ancora nessun piano. La sera scrivi a Claude «pianifica domani».")}</div>`}
@@ -508,7 +514,11 @@ function renderPlan(){
     }
     h+=`</div>`;
   }
-  return h+renderCare()+renderWake()+renderList("exit")+renderList("night")+renderKeyCard();
+  return h+renderCare()+renderWake()+renderExit()+renderList("night")+renderKeyCard();
+}
+function renderExit(){
+  const pl=planCur?plans[planCur]:null;
+  return renderList(pl&&!pl.error&&(pl.lists||[]).includes("exit")?"exit":"light");
 }
 function renderWake(){
   const pl=planCur?plans[planCur]:null;
