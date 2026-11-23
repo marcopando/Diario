@@ -345,6 +345,7 @@ document.addEventListener("click",e=>{
   else if(a==="xtick"){const k=t.dataset.k,d=listDone(k);if(d[t.dataset.id])delete d[t.dataset.id];else d[t.dataset.id]=true;write(LISTS[k].tick+listDate(k),d);forceRender()}
   else if(a==="xup"){const k=t.dataset.k,i=+t.dataset.i;if(i>0){const it=listItems(k).map(x=>({...x}));[it[i-1],it[i]]=[it[i],it[i-1]];saveList(k,it);forceRender()}}
   else if(a==="xdel"){const k=t.dataset.k,it=listItems(k).filter((_,i)=>i!==+t.dataset.i);if(!it.length){toast("Serve almeno una voce");return}saveList(k,it);forceRender()}
+  else if(a==="xhead"){const k=t.dataset.k,it=listItems(k).map(x=>({...x})),i=+t.dataset.i;if(it[i]){it[i].head=!it[i].head;saveList(k,it);forceRender()}}
   else if(a==="xsub"){const k=t.dataset.k,it=listItems(k).map(x=>({...x})),i=+t.dataset.i;if(it[i]){it[i].sub=!it[i].sub;saveList(k,it);forceRender()}}
   else if(a==="xadd"){const k=t.dataset.k,it=listItems(k).map(x=>({...x}));it.push({id:"x"+Date.now().toString(36),text:"Nuova voce"});saveList(k,it);forceRender()}
   else if(a==="qadd"){const items=Q().map(q=>({...q}));items.push({id:"q"+Date.now().toString(36),text:"Nuova domanda",pos:true});saveCfg(items);forceRender()}
@@ -404,7 +405,7 @@ const LISTS={
   {id:"l3",text:"Portafogli"},
   {id:"l4",text:"Porta chiusa"}]},
  wake:{title:"Appena sveglio",cfg:"config/wakelist",tick:"ticksw/",def:[
-  {id:"w1",text:"Igiene personale"},
+  {id:"w1",text:"Igiene personale",head:true},
   {id:"w1a",text:"Denti",sub:true},
   {id:"w1b",text:"Viso",sub:true},
   {id:"w1c",text:"Barba",sub:true},
@@ -423,10 +424,11 @@ function saveList(k,items){write(LISTS[k].cfg,{items})}
 function listDate(k){return k==="wake"||k==="exit"||k==="light"?(planCur||today()):today()}
 function listDone(k){try{return JSON.parse(localStorage.getItem(KEY+LISTS[k].tick+listDate(k)))||{}}catch(e){return{}}}
 function renderList(k){
-  const items=listItems(k),done=listDone(k);
+  const all=listItems(k),done=listDone(k),items=all.filter(x=>!x.head);
   const n=items.filter(x=>done[x.id]).length;
   let h=`<div class="card"><div class="row" style="justify-content:space-between;margin-bottom:4px"><div style="font-weight:600">${LISTS[k].title}</div><div class="mut">${n===items.length?"Tutto pronto ✓":n+"/"+items.length}</div></div>`;
-  for(const x of items){
+  for(const x of all){
+    if(x.head){h+=`<div style="font-weight:600;padding:8px 0 2px">${esc(x.text)}</div>`;continue}
     const on=!!done[x.id];
     h+=`<div class="q" style="padding:2px 0${x.sub?";padding-left:22px":""}"><div class="qr"><div class="qt" style="${on?"color:var(--mut);text-decoration:line-through":""}">${esc(x.text)}</div><div class="yn"><button class="b y ${on?"on":""}" data-act="xtick" data-k="${k}" data-id="${esc(x.id)}" style="min-width:52px;height:34px">${on?"✓":""}</button></div></div></div>`;
   }
@@ -435,7 +437,7 @@ function renderList(k){
 function renderListEdit(k){
   const items=listItems(k);
   let h=`<div class="card mut" style="margin:12px 0">Lista «${LISTS[k].etitle||LISTS[k].title}»: appare in Domani${k==="exit"?" nei giorni di lavoro":k==="light"?" nei giorni liberi":""}. Le spunte si azzerano ogni giorno.</div><div class="card">`;
-  items.forEach((x,i)=>{h+=`<div class="set"><input type="text" data-act="xtext" data-k="${k}" data-i="${i}" value="${esc(x.text)}"><button class="sm" data-act="xsub" data-k="${k}" data-i="${i}" title="Sotto-voce">${x.sub?"⇤":"⇥"}</button><button class="sm" data-act="xup" data-k="${k}" data-i="${i}">↑</button><button class="sm" data-act="xdel" data-k="${k}" data-i="${i}">✕</button></div>`});
+  items.forEach((x,i)=>{h+=`<div class="set"><input type="text" data-act="xtext" data-k="${k}" data-i="${i}" value="${esc(x.text)}"><button class="sm" data-act="xhead" data-k="${k}" data-i="${i}" title="Titolo senza casella">${x.head?"☐":"T"}</button><button class="sm" data-act="xsub" data-k="${k}" data-i="${i}" title="Sotto-voce">${x.sub?"⇤":"⇥"}</button><button class="sm" data-act="xup" data-k="${k}" data-i="${i}">↑</button><button class="sm" data-act="xdel" data-k="${k}" data-i="${i}">✕</button></div>`});
   return h+`<div style="margin-top:12px"><button class="btn p" data-act="xadd" data-k="${k}">+ Aggiungi voce</button></div></div>`;
 }
 /* ---- piano di domani: file cifrati nel repository, chiave solo sul telefono ---- */
